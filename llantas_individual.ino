@@ -9,11 +9,6 @@
 int test = 0;
 int pwmValue = 80;         // Valor constante de PWM, ajusta según necesidad (0-255)
 
-// 1=Adelante
-// 2=Atras
-// 'r'=Derecha
-// 'l'=Izquierda
-
 void setup() {
   Serial.begin(115200);
   pinMode(pwmPin, OUTPUT);
@@ -22,19 +17,7 @@ void setup() {
 }
 
 void loop() {
-  
-  // Aquí podrías añadir lógica adicional si necesitas manejar otros aspectos
-  // Por ahora, solo se mantiene constante el PWM
 
-  if (Serial.available() > 0) {
-      char input = Serial.read(); // Leer un carácter del serial
-      if (isdigit(input)) {       // Verificar si es un número
-        test = input - '0';       // Convertir el carácter a un número entero
-      } else {
-        test = -1;
-      } 
-    }
-      Serial.println(test);
       digitalWrite(pinDir, HIGH);  // Establecer dirección
       analogWrite(pwmPin, pwmValue); // Aplicar valor PWM al motor
       Serial.println("Iniciando");
@@ -54,9 +37,8 @@ void loop() {
       analogWrite(pwmPin, 0);
 
       //----------------------------------------------------------//
-      Serial.println(test);
       
-      digitalWrite(pinDir1,HIGH);  // Establecer dirección // Aplicar valor PWM al motor
+      digitalWrite(pinDir1,HIGH);  // Establecer dirección 
       Serial.println("Iniciando");
       for(int i=0; i<80;i++){ 
         pwmValue = i;
@@ -72,10 +54,10 @@ void loop() {
       }
       delay(100);
       analogWrite(pwmPin1, 0);
-      Serial.println(test);
 
+  //----------------------------------------------------------//
       
-      digitalWrite(pinDir2, HIGH);   // Aplicar valor PWM al motor
+      digitalWrite(pinDir2, HIGH);   
       Serial.println("Iniciando");
       for(int i=0; i<80;i++){ 
         pwmValue = i;
@@ -91,6 +73,8 @@ void loop() {
       }
       delay(100);
       analogWrite(pwmPin2, 0);
+
+  //----------------------------------------------------------//
 
       digitalWrite(pinDir3, HIGH);   // Aplicar valor PWM al motor
       Serial.println("Iniciando");

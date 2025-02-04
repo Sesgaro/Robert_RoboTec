@@ -6,14 +6,16 @@ class llanta {
     int pwmPin;
     int dirPin;
     int pwmValue;
+    int posValue;
 
   public:
-    llanta() : pwmPin(0), dirPin(0), pwmValue(0) {}
+    llanta() : pwmPin(0), dirPin(0), pwmValue(0), posValue(0) {}
 
-    llanta(int pwmp, int dirp, int value) {
+    llanta(int pwmp, int dirp, int value, int pos) { //pos es izquierda o derecha
       this->pwmPin = pwmp;
       this->dirPin = dirp;
       this->pwmValue = value;
+      this->posValue = pos;
       pinMode(pwmPin, OUTPUT);
       pinMode(dirPin, OUTPUT);
     }
@@ -32,7 +34,13 @@ class llanta {
           delay(10);
         }
       }
-      digitalWrite(dirPin, HIGH);
+      if(posValue == 0){  
+        digitalWrite(dirPin, HIGH);
+      }
+      else{
+        digitalWrite(dirPin, LOW);
+      }
+      
       for(int i=0; i<100;i++){ 
         pwmValue = i;
         analogWrite(pwmPin, pwmValue);
@@ -49,7 +57,12 @@ class llanta {
           delay(10);
         }
       }
-      digitalWrite(dirPin, LOW);
+      if(posValue == 0){  
+        digitalWrite(dirPin, LOW);
+      }
+      else{
+        digitalWrite(dirPin, HIGH);
+      }
       for(int i=0; i<100;i++){ 
         pwmValue = i;
         analogWrite(pwmPin, pwmValue);
@@ -68,10 +81,10 @@ class llanta {
 };
 
 // Instancias globales de las llantas
-llanta llanta1(23, 22, 0);  // Adelante Izquierda
-llanta llanta2(26, 27, 0);  // Atras Izquierda
-llanta llanta3(32, 33, 0);  // Adelante Derecha
-llanta llanta4(21, 19, 0);    // Atras Derecha
+llanta llanta1(23, 22, 0, 0);  // Adelante Izquierda
+llanta llanta2(26, 27, 0, 0);  // Atras Izquierda
+llanta llanta3(32, 33, 0, 1);  // Adelante Derecha
+llanta llanta4(21, 19, 0, 1);    // Atras Derecha
 
 BluetoothSerial SerialBT;
 int test = 0;

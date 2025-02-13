@@ -13,4 +13,6 @@ Este es el repo oficial no oficial del Robert.
 
 Python Dev
 * to avoid incompatibilities with other modules installed on your pc, you must create a virtual environment.
-  py -m venv .\[folder_name]\
+```
+py -m venv .\[folder_name]\
+```

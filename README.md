@@ -16,3 +16,7 @@ Python Dev
 ```
 py -m venv .\[folder_name]\
 ```
+*to run this virtual environment, go to the created folder named 'scripts' and run the file 'activate'.
+```
+.\activate
+```

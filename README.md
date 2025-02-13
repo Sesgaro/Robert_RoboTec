@@ -24,6 +24,13 @@ py -m venv .\[folder_name]\
 .\activate
 ```
 
+* Now install the requirements with the following command:
+```
+pip install -r ./requirements.txt
+```
+
+* With this, we can start, the file 'UART_Test1.py' we can read 2 ESPs, this is a test for simultaneous reading of two ports when receiving data.
+
 * In case you have problems in windows give several permissions:
 
 ```

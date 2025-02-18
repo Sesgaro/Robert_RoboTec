@@ -36,3 +36,9 @@ With this, we can start, the file 'UART_Test1.py' we can read 2 ESPs, this is a 
 ```
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
 ```
+
+# Update
+
+'Pwm_and_control_Test1.py' This code is the first control connection test, controller -> Laptop/Jetson -> ESP.
+
+The computer sends a text string each time the trigger values are updated, the ESP separates and transforms from scripts to integer and float values.

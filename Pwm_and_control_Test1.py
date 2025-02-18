@@ -89,6 +89,10 @@ from inputs import get_gamepad
 esp = serial.Serial('COM10', 115200) # Or whatever your serial port is, in Mac/Linux it's usually /dev/ttyUSB0
 time.sleep(2)
 
+def callESP(COM, NUMBER):       #FUNCIÓN PARA LA COMUNICACIÓN DE LA ESP
+    esp = serial.Serial(COM, NUMBER) # Or whatever your serial port is, in Mac/Linux it's usually /dev/ttyUSB0
+    time.sleep(2)
+
 motor_factors = {
     "M1": 1.0,
     "M2": 0.8,

@@ -1,6 +1,4 @@
 '''
-// Arduino Code
-
 #define M1_PWM 4    // Right front
 #define M1_DIR 5    // Right front
 #define M2_PWM 1    // Left front
@@ -10,9 +8,15 @@
 #define M4_PWM 41   // Left back
 #define M4_DIR 40   // Left back
 
-float M1_F, M2_F, M3_F, M4_F;
 
-const int LED = 48;
+int M1_DI, M2_DI, M3_DI, M4_DI;
+
+int M1_F = 100, M2_F = 80, M3_F = 90, M4_F = 120;
+
+int Speed;
+
+int lastDirection1, lastDirection2, lastDirection3, lastDirection4 = -1;  // Almacena última dirección
+#define LED 48
 
 void setup() {
   Serial.begin(115200);
@@ -26,83 +30,99 @@ void setup() {
   pinMode(M4_PWM, OUTPUT);
   pinMode(M4_DIR, OUTPUT);
 
-  neopixelWrite(LED,0,0,0);
+  neopixelWrite(LED, 0, 0, 0);
 }
 
 void accelerate(int targetSpeed) {
   static int currentSpeed = 0;
   while (currentSpeed != targetSpeed) {
-    currentSpeed += (targetSpeed > currentSpeed) ? 5 : -5;
+    currentSpeed += (targetSpeed > currentSpeed) ? 1 : -1;
     
-    analogWrite(M1_PWM, currentSpeed * M1_F);
-    analogWrite(M2_PWM, currentSpeed * M2_F);
-    analogWrite(M3_PWM, currentSpeed * M3_F);
-    analogWrite(M4_PWM, currentSpeed * M4_F);
+    analogWrite(M1_PWM, currentSpeed * (M1_F / 100.0));
+    analogWrite(M2_PWM, currentSpeed * (M2_F / 100.0));
+    analogWrite(M3_PWM, currentSpeed * (M3_F / 100.0));
+    analogWrite(M4_PWM, currentSpeed * (M4_F / 100.0));
+
+    Serial.print("Velocidad actual: ");
     Serial.println(currentSpeed);
-    delay(20);
+    delay(10);
   }
 }
 
 void loop() {
   if (Serial.available()) {
-    neopixelWrite(LED,255,128,0);
+    neopixelWrite(LED, 255, 128, 0);   // Lights LED indicating activity 
 
     String data = Serial.readStringUntil('\n');
-    
-    float M1_F = data.substring(data.indexOf("M1:") + 3, data.indexOf(",")).toFloat();
-    float M2_F = data.substring(data.indexOf("M2:") + 3, data.indexOf(",")).toFloat();
-    float M3_F = data.substring(data.indexOf("M3:") + 3, data.indexOf(",")).toFloat();
-    float M4_F = data.substring(data.indexOf("M4:") + 3, data.indexOf(",")).toFloat();
 
-    int   Speed = data.substring(data.indexOf("Speed:") + 3, data.indexOf(",")).toInt();
-    
-    int directionIndex = data.lastIndexOf(",") + 1;
-    int directionM = data.substring(directionIndex).toInt();
+    int m1_idx = data.indexOf("M1:") + 3;
+    int m2_idx = data.indexOf("M2:") + 3;
+    int m3_idx = data.indexOf("M3:") + 3;
+    int m4_idx = data.indexOf("M4:") + 3;
+    int speed_idx = data.indexOf("Speed:") + 6;
 
-    int aux = directionM;
+    M1_F = data.substring(m1_idx, data.indexOf(",", m1_idx)).toInt();
+    M1_DI = data.substring(data.indexOf(",", m1_idx) + 1, data.indexOf(";", m1_idx)).toInt();
 
-    if (directionM != aux && Speed > 0 ) {
+    M2_F = data.substring(m2_idx, data.indexOf(",", m2_idx)).toInt();
+    M2_DI = data.substring(data.indexOf(",", m2_idx) + 1, data.indexOf(";", m2_idx)).toInt();
+
+    M3_F = data.substring(m3_idx, data.indexOf(",", m3_idx)).toInt();
+    M3_DI = data.substring(data.indexOf(",", m3_idx) + 1, data.indexOf(";", m3_idx)).toInt();
+
+    M4_F = data.substring(m4_idx, data.indexOf(",", m4_idx)).toInt();
+    M4_DI = data.substring(data.indexOf(",", m4_idx) + 1, data.indexOf(";", m4_idx)).toInt();
+
+    Speed = data.substring(speed_idx).toInt();
+
+   
+
+
+ // Direction
+
+    // If the direction changes, stop motors before switching 
+    if ((M1_DI != lastDirection1 && Speed > 0) || (M2_DI != lastDirection2 && Speed > 0) || (M3_DI != lastDirection3 && Speed > 0) || (M4_DI != lastDirection4 && Speed > 0)) {
       accelerate(0);
+      lastDirection1 = M1_DI;
+      lastDirection2 = M2_DI;
+      lastDirection3 = M3_DI;
+      lastDirection4 = M4_DI;
     }
-    
-    digitalWrite(M1_DIR, directionM);
-    digitalWrite(M2_DIR, directionM);
-    digitalWrite(M3_DIR, directionM);
-    digitalWrite(M4_DIR, directionM);
+ // Set address individually 
+    digitalWrite(M1_DIR, M1_DI);
+    digitalWrite(M2_DIR, M2_DI);
+    digitalWrite(M3_DIR, M3_DI);
+    digitalWrite(M4_DIR, M4_DI);
 
-    Serial.println(Speed);
-    
     accelerate(Speed);
-    
+
   }
-  
 }
 
-'''
 
+'''
 import serial
 import time
 from inputs import get_gamepad
 
 
-# Serial port
-esp = serial.Serial('COM10', 115200) # Or whatever your serial port is, in Mac/Linux it's usually /dev/ttyUSB0
-time.sleep(2)
-
-def callESP(COM, NUMBER):       #FUNCIÓN PARA LA COMUNICACIÓN DE LA ESP
-    esp = serial.Serial(COM, NUMBER) # Or whatever your serial port is, in Mac/Linux it's usually /dev/ttyUSB0
-    time.sleep(2)
+esp = serial.Serial('COM8', 115200, timeout=1)  # Or whatever your serial port is, in Mac/Linux it's usually /dev/ttyUSB0
+time.sleep(2)  # Wait for ESP to start 
 
 motor_factors = {
-    "M1": 1.0,
-    "M2": 0.8,
-    "M3": 0.9,
-    "M4": 1.2,
+    "M1": 100,
+    "M2": 80,
+    "M3": 90,
+    "M4": 120,
 }
 
 trigger_left = 0
 trigger_right = 0
-last_data = ""  # Temp data
+last_data = ""  # Last data sent to avoid redundancies
+
+def map_range(value, in_min, in_max, out_min, out_max):
+    """Mapea un valor de un rango a otro."""
+    return int((value - in_min) * (out_max - out_min) / (in_max - in_min) + out_min)
 
 while True:
     events = get_gamepad()
@@ -115,25 +135,28 @@ while True:
     if trigger_left > 0 and trigger_right > 0:
         base_speed = 0
         direction = 0
-
     elif trigger_left > 0:
-        base_speed = int(trigger_left) // 2
-        direction = 1
-
+        base_speed = map_range(trigger_left, 0, 255, 0, 100)
+        direction = 1  
     elif trigger_right > 0:
-        base_speed = int(trigger_right) // 2
-        direction = 0
-        
+        base_speed = map_range(trigger_right, 0, 255, 0, 100)
+        direction = 0  
     else:
         base_speed = 0
         direction = 0
 
-    data = f"M1:{motor_factors["M1"]},{direction};M2:{motor_factors["M2"]},{direction};M3:{motor_factors["M3"]},{direction};M4:{motor_factors["M4"]},{direction};Speed:{base_speed}\n"
-    # print(f"ESP1: {datos1}")
-    if data != last_data:
-        esp.write(data.encode())
-        time.sleep(0.05)
+    data = f"M1:{motor_factors['M1']},{direction};M2:{motor_factors['M2']},{direction};"
+    data += f"M3:{motor_factors['M3']},{direction};M4:{motor_factors['M4']},{direction};Speed:{base_speed}\n"
 
+    esp.write(data.encode())
+
+    print("Enviado a ESP:", data.strip())
+
+    datos1 = esp.readline().decode('utf-8').strip()
+    print(f"ESP1: {datos1}")
+
+    # Send data only if there are changes
+    if data != last_data:
         last_data = data
 
-
+    time.sleep(0.02)

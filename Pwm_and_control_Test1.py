@@ -159,12 +159,3 @@ def map_range(value, in_min, in_max, out_min, out_max):
     """Mapea un valor de un rango a otro."""
     return int((value - in_min) * (out_max - out_min) / (in_max - in_min) + out_min)
 
-ESPvalue = espDefine()
-motorFactors = {
-    "M1": 100,
-    "M2": 80,
-    "M3": 90,
-    "M4": 120,
-}
-
-espMagic(ESPvalue, motorFactors)

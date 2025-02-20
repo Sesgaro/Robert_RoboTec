@@ -106,14 +106,12 @@ import time
 from inputs import get_gamepad
 
 
-def funcion1():
-  print("1")
+def espDefine():
   esp = serial.Serial('COM8', 115200, timeout=1)  # Or whatever your serial port is, in Mac/Linux it's usually /dev/ttyUSB0
   time.sleep(2)  # Wait for ESP to start
   return esp
 
-def funcion2(esp):
-  print("2")
+def espMagic(esp, motor_factors):
   events = get_gamepad()
   for event in events:
       if event.code == "ABS_Z":
@@ -153,13 +151,6 @@ def funcion2(esp):
   time.sleep(0.02)
 
 
-motor_factors = {
-    "M1": 100,
-    "M2": 80,
-    "M3": 90,
-    "M4": 120,
-}
-
 trigger_left = 0
 trigger_right = 0
 last_data = ""  # Last data sent to avoid redundancies
@@ -168,5 +159,12 @@ def map_range(value, in_min, in_max, out_min, out_max):
     """Mapea un valor de un rango a otro."""
     return int((value - in_min) * (out_max - out_min) / (in_max - in_min) + out_min)
 
-pruebaESP = funcion1()
-funcion2(pruebaESP)
+ESPvalue = espDefine()
+motorFactors = {
+    "M1": 100,
+    "M2": 80,
+    "M3": 90,
+    "M4": 120,
+}
+
+espMagic(ESPvalue, motorFactors)

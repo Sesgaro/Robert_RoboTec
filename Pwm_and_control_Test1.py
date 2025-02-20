@@ -106,8 +106,52 @@ import time
 from inputs import get_gamepad
 
 
-esp = serial.Serial('COM8', 115200, timeout=1)  # Or whatever your serial port is, in Mac/Linux it's usually /dev/ttyUSB0
-time.sleep(2)  # Wait for ESP to start 
+def funcion1():
+  print("1")
+  esp = serial.Serial('COM8', 115200, timeout=1)  # Or whatever your serial port is, in Mac/Linux it's usually /dev/ttyUSB0
+  time.sleep(2)  # Wait for ESP to start
+  return esp
+
+def funcion2(esp):
+  print("2")
+  events = get_gamepad()
+  for event in events:
+      if event.code == "ABS_Z":
+          trigger_left = event.state
+      elif event.code == "ABS_RZ":
+          trigger_right = event.state
+
+  if trigger_left > 0 and trigger_right > 0:
+      base_speed = 0
+      direction = 0
+  elif trigger_left > 0:
+      base_speed = map_range(trigger_left, 0, 255, 0, 100)
+      direction = 1  
+  elif trigger_right > 0:
+      base_speed = map_range(trigger_right, 0, 255, 0, 100)
+      direction = 0  
+  else:
+      base_speed = 0
+      direction = 0
+
+  data = f"M1:{motor_factors['M1']},{direction};M2:{motor_factors['M2']},{direction};"
+  data += f"M3:{motor_factors['M3']},{direction};M4:{motor_factors['M4']},{direction};Speed:{base_speed}\n"
+
+  esp.write(data.encode())
+
+  print("Enviado a ESP:", data.strip())
+
+  """
+  datos1 = esp.readline().decode('utf-8').strip()
+  print(f"ESP1: {datos1}")
+  """
+
+  # Send data only if there are changes
+  if data != last_data:
+      last_data = data
+
+  time.sleep(0.02)
+
 
 motor_factors = {
     "M1": 100,
@@ -124,39 +168,5 @@ def map_range(value, in_min, in_max, out_min, out_max):
     """Mapea un valor de un rango a otro."""
     return int((value - in_min) * (out_max - out_min) / (in_max - in_min) + out_min)
 
-while True:
-    events = get_gamepad()
-    for event in events:
-        if event.code == "ABS_Z":
-            trigger_left = event.state
-        elif event.code == "ABS_RZ":
-            trigger_right = event.state
-
-    if trigger_left > 0 and trigger_right > 0:
-        base_speed = 0
-        direction = 0
-    elif trigger_left > 0:
-        base_speed = map_range(trigger_left, 0, 255, 0, 100)
-        direction = 1  
-    elif trigger_right > 0:
-        base_speed = map_range(trigger_right, 0, 255, 0, 100)
-        direction = 0  
-    else:
-        base_speed = 0
-        direction = 0
-
-    data = f"M1:{motor_factors['M1']},{direction};M2:{motor_factors['M2']},{direction};"
-    data += f"M3:{motor_factors['M3']},{direction};M4:{motor_factors['M4']},{direction};Speed:{base_speed}\n"
-
-    esp.write(data.encode())
-
-    print("Enviado a ESP:", data.strip())
-
-    datos1 = esp.readline().decode('utf-8').strip()
-    print(f"ESP1: {datos1}")
-
-    # Send data only if there are changes
-    if data != last_data:
-        last_data = data
-
-    time.sleep(0.02)
+pruebaESP = funcion1()
+funcion2(pruebaESP)

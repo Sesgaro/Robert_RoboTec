@@ -15,7 +15,8 @@ int M1_F = 100, M2_F = 80, M3_F = 90, M4_F = 120;
 
 int Speed;
 
-int lastDirection1, lastDirection2, lastDirection3, lastDirection4 = -1;  // Almacena última dirección
+int lastDirection1, lastDirection2, lastDirection3, lastDirection4 = -1;
+
 #define LED 48
 
 void setup() {
@@ -36,7 +37,7 @@ void setup() {
 void accelerate(int targetSpeed) {
   static int currentSpeed = 0;
   while (currentSpeed != targetSpeed) {
-    currentSpeed += (targetSpeed > currentSpeed) ? 1 : -1;
+    currentSpeed += (targetSpeed > currentSpeed) ? 5 : -5;
     
     analogWrite(M1_PWM, currentSpeed * (M1_F / 100.0));
     analogWrite(M2_PWM, currentSpeed * (M2_F / 100.0));
@@ -45,7 +46,7 @@ void accelerate(int targetSpeed) {
 
     Serial.print("Velocidad actual: ");
     Serial.println(currentSpeed);
-    delay(10);
+    delay(40);
   }
 }
 
@@ -98,16 +99,14 @@ void loop() {
 
   }
 }
-
-
 '''
 import serial
 import time
 from inputs import get_gamepad
 
 
-def espDefine():
-  esp = serial.Serial('COM8', 115200, timeout=1)  # Or whatever your serial port is, in Mac/Linux it's usually /dev/ttyUSB0
+def espDefine(port):
+  esp = serial.Serial(port, 115200, timeout=1)  # Or whatever your serial port is, in Mac/Linux it's usually /dev/ttyUSB0
   time.sleep(2)  # Wait for ESP to start
   return esp
 
@@ -116,28 +115,26 @@ def espMagic(esp, motor_factors):
   for event in events:
       if event.code == "ABS_Z":
           trigger_left = event.state
+        
       elif event.code == "ABS_RZ":
           trigger_right = event.state
 
   if trigger_left > 0 and trigger_right > 0:
       base_speed = 0
-      direction = 0
+    
   elif trigger_left > 0:
       base_speed = map_range(trigger_left, 0, 255, 0, 100)
       direction = 1  
+    
   elif trigger_right > 0:
       base_speed = map_range(trigger_right, 0, 255, 0, 100)
       direction = 0  
   else:
       base_speed = 0
-      direction = 0
+
 
   data = f"M1:{motor_factors['M1']},{direction};M2:{motor_factors['M2']},{direction};"
   data += f"M3:{motor_factors['M3']},{direction};M4:{motor_factors['M4']},{direction};Speed:{base_speed}\n"
-
-  esp.write(data.encode())
-
-  print("Enviado a ESP:", data.strip())
 
   """
   datos1 = esp.readline().decode('utf-8').strip()
@@ -145,8 +142,10 @@ def espMagic(esp, motor_factors):
   """
 
   # Send data only if there are changes
-  if data != last_data:
-      last_data = data
+  if data != last_data and base_speed % 5 == 0:
+        esp.write(data.encode())
+        print("Enviado a ESP:", data.strip())
+        last_data = data
 
   time.sleep(0.02)
 
@@ -156,6 +155,5 @@ trigger_right = 0
 last_data = ""  # Last data sent to avoid redundancies
 
 def map_range(value, in_min, in_max, out_min, out_max):
-    """Mapea un valor de un rango a otro."""
     return int((value - in_min) * (out_max - out_min) / (in_max - in_min) + out_min)
 

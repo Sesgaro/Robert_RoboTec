@@ -3,7 +3,7 @@ import serial
 import time
 from inputs import get_gamepad
 
-ESPvalue = espDefine()
+ESPvalue = espDefine('COM8')
 
 motorFactors = {
     "M1": 100,
@@ -11,5 +11,5 @@ motorFactors = {
     "M3": 90,
     "M4": 120,
 }
-While True:
+while True:
     espMagic(ESPvalue, motorFactors)

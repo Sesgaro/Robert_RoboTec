@@ -11,5 +11,5 @@ motorFactors = {
     "M3": 90,
     "M4": 120,
 }
-
-espMagic(ESPvalue, motorFactors)
+While True:
+    espMagic(ESPvalue, motorFactors)

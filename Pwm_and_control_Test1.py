@@ -103,14 +103,12 @@ void loop() {
 import serial
 import time
 
-trigger_left = 0
-trigger_right = 0
 last_data = ""  # Last data sent to avoid redundancies
 
 def map_range(value, in_min, in_max, out_min, out_max):
     return int((value - in_min) * (out_max - out_min) / (in_max - in_min) + out_min)
 
-def espDefine(port):
+def espDefine(port: str):
   esp = serial.Serial(port, 115200, timeout=1)  # Or whatever your serial port is, in Mac/Linux it's usually /dev/ttyUSB0
   time.sleep(2)  # Wait for ESP to start
   return esp
@@ -120,7 +118,6 @@ def espMagic(esp, motor_factors, trigger_left, trigger_right):
   # for event in events:
   #     if event.code == "ABS_Z":
   #         trigger_left = event.state
-        
   #     elif event.code == "ABS_RZ":
   #         trigger_right = event.state
 
@@ -133,18 +130,12 @@ def espMagic(esp, motor_factors, trigger_left, trigger_right):
     
   elif trigger_right > 0:
       base_speed = map_range(trigger_right, 0, 255, 0, 100)
-      direction = 0  
+      direction = 0
   else:
       base_speed = 0
 
-
   data = f"M1:{motor_factors['M1']},{direction};M2:{motor_factors['M2']},{direction};"
   data += f"M3:{motor_factors['M3']},{direction};M4:{motor_factors['M4']},{direction};Speed:{base_speed}\n"
-
-  """
-  datos1 = esp.readline().decode('utf-8').strip()
-  print(f"ESP1: {datos1}")
-  """
 
   # Send data only if there are changes
   if data != last_data and base_speed % 5 == 0:

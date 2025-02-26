@@ -11,5 +11,21 @@ motorFactors = {
     "M3": 90,
     "M4": 120,
 }
+
 while True:
-    espMagic(ESPvalue, motorFactors)
+    
+    for event in events:
+        
+      if event.code == "ABS_Z":
+          trigger_left = event.state
+        
+      elif event.code == "ABS_RZ":
+          trigger_right = event.state
+          
+      elif event.code == "ABS_X":
+          joy1 = event.state
+          
+      elif event.code == "ABS_RX":
+          joy2 = event.state
+          
+    espMagic(ESPvalue, motorFactors, trigger_left, trigger_right)

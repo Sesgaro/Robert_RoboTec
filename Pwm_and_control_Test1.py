@@ -102,12 +102,10 @@ void loop() {
 '''
 import serial
 import time
-from inputs import get_gamepad
 
 trigger_left = 0
 trigger_right = 0
 last_data = ""  # Last data sent to avoid redundancies
-
 
 def map_range(value, in_min, in_max, out_min, out_max):
     return int((value - in_min) * (out_max - out_min) / (in_max - in_min) + out_min)
@@ -151,7 +149,6 @@ def espMagic(esp, motor_factors, trigger_left, trigger_right):
   # Send data only if there are changes
   if data != last_data and base_speed % 5 == 0:
         esp.write(data.encode())
-        # print("Enviado a ESP:", data.strip())
         last_data = data
 
   time.sleep(0.02)

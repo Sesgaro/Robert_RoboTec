@@ -104,20 +104,27 @@ import serial
 import time
 from inputs import get_gamepad
 
+trigger_left = 0
+trigger_right = 0
+last_data = ""  # Last data sent to avoid redundancies
+
+
+def map_range(value, in_min, in_max, out_min, out_max):
+    return int((value - in_min) * (out_max - out_min) / (in_max - in_min) + out_min)
 
 def espDefine(port):
   esp = serial.Serial(port, 115200, timeout=1)  # Or whatever your serial port is, in Mac/Linux it's usually /dev/ttyUSB0
   time.sleep(2)  # Wait for ESP to start
   return esp
 
-def espMagic(esp, motor_factors):
-  events = get_gamepad()
-  for event in events:
-      if event.code == "ABS_Z":
-          trigger_left = event.state
+def espMagic(esp, motor_factors, trigger_left, trigger_right):
+  # events = get_gamepad()
+  # for event in events:
+  #     if event.code == "ABS_Z":
+  #         trigger_left = event.state
         
-      elif event.code == "ABS_RZ":
-          trigger_right = event.state
+  #     elif event.code == "ABS_RZ":
+  #         trigger_right = event.state
 
   if trigger_left > 0 and trigger_right > 0:
       base_speed = 0
@@ -144,16 +151,7 @@ def espMagic(esp, motor_factors):
   # Send data only if there are changes
   if data != last_data and base_speed % 5 == 0:
         esp.write(data.encode())
-        print("Enviado a ESP:", data.strip())
+        # print("Enviado a ESP:", data.strip())
         last_data = data
 
   time.sleep(0.02)
-
-
-trigger_left = 0
-trigger_right = 0
-last_data = ""  # Last data sent to avoid redundancies
-
-def map_range(value, in_min, in_max, out_min, out_max):
-    return int((value - in_min) * (out_max - out_min) / (in_max - in_min) + out_min)
-

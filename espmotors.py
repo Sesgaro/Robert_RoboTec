@@ -1,157 +1,243 @@
 '''
-#define M1_PWM 4    // Right front
-#define M1_DIR 5    // Right front
-#define M2_PWM 1    // Left front
-#define M2_DIR 2    // Left front
-#define M3_PWM 7    // Right back
-#define M3_DIR 15   // Right back
-#define M4_PWM 41   // Left back
-#define M4_DIR 40   // Left back
+#include <Wire.h>
+
+const int I2C_ADDRESS = 0x10; // I2C Direction
+
+struct DirectionMotor {
+    int pwmPinForward;
+    int pwmPinReverse;
+    int speed;
+    int directionM;
+};
+
+DirectionMotor DMotors[4] = {
+    {16, 17, 0, 0}, 
+    {21, 22, 0, 0}, 
+    {23, 24, 0, 0}  
+};
+
+struct WheelMotor {
+    int pwmPin;
+    int dirPin;
+    int factor;
+    int directionM;
+    int lastDirection;
+};
+
+WheelMotor WMotors[4] = {
+    {4, 5, 0, 0, -1}, // M1
+    {1, 2, 0, 0, -1}, // M2
+    {7, 15, 0, 0, -1}, // M3
+    {41, 40, 0, 0, -1} // M4
+};
 
 
-int M1_DI, M2_DI, M3_DI, M4_DI;
-
-int M1_F = 100, M2_F = 80, M3_F = 90, M4_F = 120;
-
-int Speed;
-
-int lastDirection1, lastDirection2, lastDirection3, lastDirection4 = -1;
-
-#define LED 48
+int Speed = 0;
 
 void setup() {
+  for (int i = 0; i < 4; i++) {
+    pinMode(WMotors[i].pwmPin, OUTPUT);
+    pinMode(WMotors[i].dirPin, OUTPUT);
+    pinMode(DMotors[i].pwmPinForward, OUTPUT);
+    pinMode(DMotors[i].pwmPinReverse, OUTPUT);
+  }
+
+  Wire.begin(I2C_ADDRESS);
+  Wire.onReceive(receiveEvent);
+
   Serial.begin(115200);
+}
 
-  pinMode(M1_PWM, OUTPUT);
-  pinMode(M1_DIR, OUTPUT);
-  pinMode(M2_PWM, OUTPUT);
-  pinMode(M2_DIR, OUTPUT);
-  pinMode(M3_PWM, OUTPUT);
-  pinMode(M3_DIR, OUTPUT);
-  pinMode(M4_PWM, OUTPUT);
-  pinMode(M4_DIR, OUTPUT);
-
-  neopixelWrite(LED, 0, 0, 0);
+void receiveEvent(int howMany) {
+    String data = "";
+    while (Wire.available()) {
+        char c = Wire.read();
+        data += c;
+    }
+    TotalControl(data);
 }
 
 void accelerate(int targetSpeed) {
-  static int currentSpeed = 0;
-  while (currentSpeed != targetSpeed) {
-    currentSpeed += (targetSpeed > currentSpeed) ? 5 : -5;
-    
-    analogWrite(M1_PWM, currentSpeed * (M1_F / 100.0));
-    analogWrite(M2_PWM, currentSpeed * (M2_F / 100.0));
-    analogWrite(M3_PWM, currentSpeed * (M3_F / 100.0));
-    analogWrite(M4_PWM, currentSpeed * (M4_F / 100.0));
-
-    Serial.print("Velocidad actual: ");
-    Serial.println(currentSpeed);
-    delay(40);
-  }
+    static int currentSpeed = 0;
+    while (currentSpeed != targetSpeed) {
+        currentSpeed += (targetSpeed > currentSpeed) ? 5 : -5;
+        for (int i = 0; i < 4; i++) {
+            int pwmValue = currentSpeed * (WMotors[i].factor / 100.0);
+            analogWrite(WMotors[i].pwmPin, pwmValue);
+        }
+        delay(40);
+    }
 }
 
-void loop() {
-  if (Serial.available()) {
-    neopixelWrite(LED, 255, 128, 0);   // Lights LED indicating activity 
-
-    String data = Serial.readStringUntil('\n');
-
-    int m1_idx = data.indexOf("M1:") + 3;
-    int m2_idx = data.indexOf("M2:") + 3;
-    int m3_idx = data.indexOf("M3:") + 3;
-    int m4_idx = data.indexOf("M4:") + 3;
-    int speed_idx = data.indexOf("Speed:") + 6;
-
-    M1_F = data.substring(m1_idx, data.indexOf(",", m1_idx)).toInt();
-    M1_DI = data.substring(data.indexOf(",", m1_idx) + 1, data.indexOf(";", m1_idx)).toInt();
-
-    M2_F = data.substring(m2_idx, data.indexOf(",", m2_idx)).toInt();
-    M2_DI = data.substring(data.indexOf(",", m2_idx) + 1, data.indexOf(";", m2_idx)).toInt();
-
-    M3_F = data.substring(m3_idx, data.indexOf(",", m3_idx)).toInt();
-    M3_DI = data.substring(data.indexOf(",", m3_idx) + 1, data.indexOf(";", m3_idx)).toInt();
-
-    M4_F = data.substring(m4_idx, data.indexOf(",", m4_idx)).toInt();
-    M4_DI = data.substring(data.indexOf(",", m4_idx) + 1, data.indexOf(";", m4_idx)).toInt();
-
-    Speed = data.substring(speed_idx).toInt();
-
-   
-
-
- // Direction
-
-    // If the direction changes, stop motors before switching 
-    if ((M1_DI != lastDirection1 && Speed > 0) || (M2_DI != lastDirection2 && Speed > 0) || (M3_DI != lastDirection3 && Speed > 0) || (M4_DI != lastDirection4 && Speed > 0)) {
-      accelerate(0);
-      lastDirection1 = M1_DI;
-      lastDirection2 = M2_DI;
-      lastDirection3 = M3_DI;
-      lastDirection4 = M4_DI;
+void TotalControl(String data) {
+    String parts[13];
+    int index = 0;
+    size_t start = 0;
+    size_t end = data.indexOf(';', start);
+    while (end != -1) {
+        parts[index++] = data.substring(start, end);
+        start = end + 1;
+        end = data.indexOf(';', start);
     }
- // Set address individually 
-    digitalWrite(M1_DIR, M1_DI);
-    digitalWrite(M2_DIR, M2_DI);
-    digitalWrite(M3_DIR, M3_DI);
-    digitalWrite(M4_DIR, M4_DI);
+    parts[index] = data.substring(start);
 
+    // Parse M1 to M4
+    for (int i = 0; i < 4; i++) {
+        String part = parts[i];
+        int colonPos = part.indexOf(':');
+        int commaPos = part.indexOf(',');
+        WMotors[i].factor = part.substring(colonPos+1, commaPos).toInt();
+        WMotors[i].directionM = part.substring(commaPos+1).toInt();
+    }
+
+    // Parse Speed
+    String speedPart = parts[4];
+    int speedIdx = speedPart.indexOf(':');
+    Speed = speedPart.substring(speedIdx+1).toInt();
+
+    // Parse M5 to M12 
+    for (int i = 0; i < 4; i++) { // Solo 4 motores nuevos, pero 8 entradas
+        String partForward = parts[5+i];
+        String partReverse = parts[9+i]; // Ajustar según duplicación
+        int colonPosF = partForward.indexOf(':');
+        int commaPosF = partForward.indexOf(',');
+        DMotors[i].speed = partForward.substring(colonPosF+1, commaPosF).toInt();
+        DMotors[i].directionM = partForward.substring(commaPosF+1).toInt();
+
+        // Set PWM based on direction
+        if (DMotors[i].directionM == 0) {
+            analogWrite(DMotors[i].pwmPinForward, DMotors[i].speed);
+            analogWrite(DMotors[i].pwmPinReverse, 0);
+        } else {
+            analogWrite(DMotors[i].pwmPinForward, 0);
+            analogWrite(DMotors[i].pwmPinReverse, DMotors[i].speed);
+        }
+    }
+
+    // Handle direction and accelerate for original motors
+    bool directionChanged = false;
+    for (int i = 0; i < 4; i++) {
+        if (WMotors[i].directionM != WMotors[i].lastDirection && Speed > 0) {
+            directionChanged = true;
+            break;
+        }
+    }
+    if (directionChanged) {
+        accelerate(0);
+        for (int i = 0; i < 4; i++) {
+            WMotors[i].lastDirection = WMotors[i].directionM;
+            digitalWrite(WMotors[i].dirPin, WMotors[i].directionM);
+        }
+    } else {
+        for (int i = 0; i < 4; i++) {
+            digitalWrite(WMotors[i].dirPin, WMotors[i].directionM);
+        }
+    }
     accelerate(Speed);
+}
 
+void loop(){
+  if (lastReceivedData != "") {
+    Serial.print("Datos recibidos via I2C: ");
+    Serial.println(lastReceivedData);
   }
+  delay(10);
+}
+
 }
 '''
-import serial
+import smbus
 import time
+
+I2C_BUS = 1  # Bus I2C 1
+I2C_ADDRESS = 0x10  # Direction
+
+bus = smbus.SMBus(I2C_BUS)
 
 def map_range(value, in_min, in_max, out_min, out_max):
     if value == 0:
-        return 0  # Si no hay entrada, no hay salida
+        return 0 
     return int((value - in_min) * (out_max - out_min) / (in_max - in_min) + out_min)
 
-def esp_define(port: str):
+
+# Function to send data to the ESP32S3 via I2C
+def send_control_string(data):
     try:
-        esp = serial.Serial(port, 115200, timeout=1)  
-        time.sleep(2)  # Esperar a que el ESP inicie
-        return esp
-    except serial.SerialException as e:
-        print(f"Error abriendo el puerto serial: {e}")
-        return None
+        # Convert string to a list of bytes (ASCII values)
+        byte_data = [ord(c) for c in data]
+        # send data to ESP32S3
+        bus.write_i2c_block_data(I2C_ADDRESS, 0, byte_data)
+        print(f"I2C: {data.strip()}")
+    except IOError as e:
+        print(f"ERROR I2C: {e}")
+    time.sleep(0.01)  
 
-def esp_magic(esp, motor_factors, trigger_left, trigger_right, last_data):
-    global direction
+# Main function to control motors
+def control_motors(motor_factors, trigger_left, trigger_right, grades_1, grades_2, last_data):
+    # Determine direction and base speed for original motors
+    direction = 0
+    base_speed = 0
 
-    if not esp or not esp.is_open:
-        print("ESP no está conectado.")
-        return last_data
-    
-    # Determinar la dirección y velocidad
+    grades_1 = 0
+
     if trigger_left > 0 and trigger_right > 0:
-        base_speed = 0
-
+        base_speed = 0  
     elif trigger_left > 0:
-        base_speed = map_range(trigger_left, 0, 255, 0, 100)
+        base_speed = trigger_left
         direction = 0  
     elif trigger_right > 0:
-        base_speed = map_range(trigger_right, 0, 255, 0, 100)
-        direction = 1
-    else:
-        base_speed = 0
-    # Construcción del mensaje
-    data = f"M1:{motor_factors['M1']},{direction};M2:{motor_factors['M2']},{direction};"
-    data += f"M3:{motor_factors['M3']},{direction};M4:{motor_factors['M4']},{direction};Speed:{base_speed}\n"
+        base_speed = trigger_right
+        direction = 1  
 
-    # Enviar solo si hay cambios significativos
-    if data != last_data and base_speed % 5 == 0:
-        esp.write(data.encode())
+    # Building the control chain for the 4 wheel motors
+    data = (
+        f"M1:{motor_factors['M1']},{direction};"
+        f"M2:{motor_factors['M2']},{direction};"
+        f"M3:{motor_factors['M3']},{direction};"
+        f"M4:{motor_factors['M4']},{direction};"
+        f"Speed:{base_speed};"
+    )
+
+    # Add control for the 4 new motors, which are steering motors.
+    DMotors = {
+        "M5": {"speed": 0, "direction": 0},  # Motor 5
+        "M6": {"speed": 0, "direction": 0},  # Motor 6
+        "M7": {"speed": 0, "direction": 0},  # Motor 7
+        "M8": {"speed": 0, "direction": 0}   # Motor 8
+    }
+
+    # Control M5 and M6 based on joy_1
+    if grades_1 < 90:
+        DMotors["M5"] = {"speed": 50, "direction": 0}  # Right (forward)
+        DMotors["M6"] = {"speed": 50, "direction": 0}  # Right (forward)
+    elif grades_1 > 90:
+        DMotors["M5"] = {"speed": 50, "direction": 1}  # Left (reverse)
+        DMotors["M6"] = {"speed": 50, "direction": 1}  # Left (reverse)
+    else:
+        DMotors["M5"] = {"speed": 0, "direction": 0}
+        DMotors["M6"] = {"speed": 0, "direction": 0}
+
+    # Control M7 and M8 based on joy_2
+    if grades_2 < 90:
+        DMotors["M7"] = {"speed": 50, "direction": 0}  # Right (forward)
+        DMotors["M8"] = {"speed": 50, "direction": 0}  # Right (forward)
+    elif grades_2 > 90:
+        DMotors["M7"] = {"speed": 50, "direction": 1}  # Left (reverse)
+        DMotors["M8"] = {"speed": 50, "direction": 1}  # Left (reverse)
+    else:
+        DMotors["M7"] = {"speed": 0, "direction": 0}
+        DMotors["M8"] = {"speed": 0, "direction": 0}
+    
+
+    # Append new motors to the control string
+    for i in range(5, 9):  # M5 to M8
+        data += f"M{i}:{DMotors[f'M{i}']['speed']},{DMotors[f'M{i}']['direction']};"
+
+
+    data += "\n"  # End the string with a line break
+
+    if data != last_data and base_speed % 5 == 0 and grades_2 % 5 == 0 and grades_1 % 5 == 0:
+        send_control_string(data)
         last_data = data
 
-    time.sleep(0.02)
-    return last_data  # Devolver el último dato enviado para evitar redundancias
-
-def read_data(esp):
-    while True:
-        datos1 = esp.readline().decode('utf-8').strip()
-        if not datos1:  # Si no hay datos, romper el bucle
-            print("No hay más datos. Saliendo...")
-            break
-        print(f"ESP1: {datos1}")
+    return last_data

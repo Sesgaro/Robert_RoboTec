@@ -30,16 +30,12 @@ last_data = ''
 
 while True:
     pygame.event.pump()
-    # new_trigger_left = int(((joystick.get_axis(4) + 1) / 2) * 250)  # Normalizar y convertir a entero
-    new_trigger_right = int(((joystick.get_axis(5) + 1) / 2) * 250) # Normalizar y convertir a entero
-    new_joy1_x = int((joystick.get_axis(0) + 1) * 90)            # Normalizar y convertir a entero
-    new_joy2_x = int((joystick.get_axis(2) + 1) * 90)            # Normalizar y convertir a entero
-    
+
     new_trigger_left = motors.map_range(joystick.get_axis(4), -1, 1, 0, 250)
     new_trigger_right = motors.map_range(joystick.get_axis(5), -1, 1, 0, 250)
     new_joy1_x = motors.map_range(joystick.get_axis(0), -1, 1, 0, 180)
     new_joy2_x = motors.map_range(joystick.get_axis(2), -1, 1, 0, 180)
-    # Redondear a múltiplos de 5
+    
     new_trigger_left = (new_trigger_left // 5) * 5
     new_trigger_right = (new_trigger_right // 5) * 5
     new_joy1_x = (new_joy1_x // 5) * 5

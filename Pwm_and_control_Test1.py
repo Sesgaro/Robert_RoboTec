@@ -103,43 +103,55 @@ void loop() {
 import serial
 import time
 
-last_data = ""  # Last data sent to avoid redundancies
-
 def map_range(value, in_min, in_max, out_min, out_max):
+    if value == 0:
+        return 0  # Si no hay entrada, no hay salida
     return int((value - in_min) * (out_max - out_min) / (in_max - in_min) + out_min)
 
-def espDefine(port: str):
-  esp = serial.Serial(port, 115200, timeout=1)  # Or whatever your serial port is, in Mac/Linux it's usually /dev/ttyUSB0
-  time.sleep(2)  # Wait for ESP to start
-  return esp
+def esp_define(port: str):
+    try:
+        esp = serial.Serial(port, 115200, timeout=1)  
+        time.sleep(2)  # Esperar a que el ESP inicie
+        return esp
+    except serial.SerialException as e:
+        print(f"Error abriendo el puerto serial: {e}")
+        return None
 
-def espMagic(esp, motor_factors, trigger_left, trigger_right):
-  # events = get_gamepad()
-  # for event in events:
-  #     if event.code == "ABS_Z":
-  #         trigger_left = event.state
-  #     elif event.code == "ABS_RZ":
-  #         trigger_right = event.state
+def esp_magic(esp, motor_factors, trigger_left, trigger_right, last_data):
+    global direction
 
-  if trigger_left > 0 and trigger_right > 0:
-      base_speed = 0
+    if not esp or not esp.is_open:
+        print("ESP no está conectado.")
+        return last_data
     
-  elif trigger_left > 0:
-      base_speed = map_range(trigger_left, 0, 255, 0, 100)
-      direction = 1  
-    
-  elif trigger_right > 0:
-      base_speed = map_range(trigger_right, 0, 255, 0, 100)
-      direction = 0
-  else:
-      base_speed = 0
+    # Determinar la dirección y velocidad
+    if trigger_left > 0 and trigger_right > 0:
+        base_speed = 0
 
-  data = f"M1:{motor_factors['M1']},{direction};M2:{motor_factors['M2']},{direction};"
-  data += f"M3:{motor_factors['M3']},{direction};M4:{motor_factors['M4']},{direction};Speed:{base_speed}\n"
+    elif trigger_left > 0:
+        base_speed = map_range(trigger_left, 0, 255, 0, 100)
+        direction = 0  
+    elif trigger_right > 0:
+        base_speed = map_range(trigger_right, 0, 255, 0, 100)
+        direction = 1
+    else:
+        base_speed = 0
+    # Construcción del mensaje
+    data = f"M1:{motor_factors['M1']},{direction};M2:{motor_factors['M2']},{direction};"
+    data += f"M3:{motor_factors['M3']},{direction};M4:{motor_factors['M4']},{direction};Speed:{base_speed}\n"
 
-  # Send data only if there are changes
-  if data != last_data and base_speed % 5 == 0:
+    # Enviar solo si hay cambios significativos
+    if data != last_data and base_speed % 5 == 0:
         esp.write(data.encode())
         last_data = data
 
-  time.sleep(0.02)
+    time.sleep(0.02)
+    return last_data  # Devolver el último dato enviado para evitar redundancias
+
+def read_data(esp):
+    while True:
+        datos1 = esp.readline().decode('utf-8').strip()
+        if not datos1:  # Si no hay datos, romper el bucle
+            print("No hay más datos. Saliendo...")
+            break
+        print(f"ESP1: {datos1}")

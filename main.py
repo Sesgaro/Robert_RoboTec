@@ -48,6 +48,5 @@ while True:
         joy1_x = new_joy1_x
         joy2_x = new_joy2_x
 
-        last_data = motors.esp_magic(ESPvalue, motorFactors, trigger_left, trigger_right, last_data)     
-        print(f"Trigger Izq: {trigger_left} | Trigger Der: {trigger_right} | Joy1 $
-
+        last_data = motors.esp_magic(ESPvalue, motorFactors, trigger_left, trigger_right, last_data)
+        print(f"Trigger Izq: {trigger_left} | Trigger Der: {trigger_right} | Joy1 X: {joy1_x} | Joy2 X: {joy2_x}")

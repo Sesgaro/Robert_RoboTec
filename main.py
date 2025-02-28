@@ -1,5 +1,5 @@
 import pygame
-import Pwm_and_control_Test1 as motors
+import espmotors as motors
 import time
 
 pygame.init()

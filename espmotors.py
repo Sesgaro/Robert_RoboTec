@@ -1,195 +1,104 @@
-'''
-#include <Wire.h>
-
-const int I2C_ADDRESS = 0x10; // I2C Direction
-
-struct DirectionMotor {
-    int pwmPinForward;
-    int pwmPinReverse;
-    int speed;
-    int directionM;
-};
-
-DirectionMotor DMotors[4] = {
-    {16, 17, 0, 0}, 
-    {21, 22, 0, 0}, 
-    {23, 24, 0, 0}  
-};
-
-struct WheelMotor {
-    int pwmPin;
-    int dirPin;
-    int factor;
-    int directionM;
-    int lastDirection;
-};
-
-WheelMotor WMotors[4] = {
-    {4, 5, 0, 0, -1}, // M1
-    {1, 2, 0, 0, -1}, // M2
-    {7, 15, 0, 0, -1}, // M3
-    {41, 40, 0, 0, -1} // M4
-};
-
-
-int Speed = 0;
-
-void setup() {
-  for (int i = 0; i < 4; i++) {
-    pinMode(WMotors[i].pwmPin, OUTPUT);
-    pinMode(WMotors[i].dirPin, OUTPUT);
-    pinMode(DMotors[i].pwmPinForward, OUTPUT);
-    pinMode(DMotors[i].pwmPinReverse, OUTPUT);
-  }
-
-  Wire.begin(I2C_ADDRESS);
-  Wire.onReceive(receiveEvent);
-
-  Serial.begin(115200);
-}
-
-void receiveEvent(int howMany) {
-    String data = "";
-    while (Wire.available()) {
-        char c = Wire.read();
-        data += c;
-    }
-    TotalControl(data);
-}
-
-void accelerate(int targetSpeed) {
-    static int currentSpeed = 0;
-    while (currentSpeed != targetSpeed) {
-        currentSpeed += (targetSpeed > currentSpeed) ? 5 : -5;
-        for (int i = 0; i < 4; i++) {
-            int pwmValue = currentSpeed * (WMotors[i].factor / 100.0);
-            analogWrite(WMotors[i].pwmPin, pwmValue);
-        }
-        delay(40);
-    }
-}
-
-void TotalControl(String data) {
-    String parts[13];
-    int index = 0;
-    size_t start = 0;
-    size_t end = data.indexOf(';', start);
-    while (end != -1) {
-        parts[index++] = data.substring(start, end);
-        start = end + 1;
-        end = data.indexOf(';', start);
-    }
-    parts[index] = data.substring(start);
-
-    // Parse M1 to M4
-    for (int i = 0; i < 4; i++) {
-        String part = parts[i];
-        int colonPos = part.indexOf(':');
-        int commaPos = part.indexOf(',');
-        WMotors[i].factor = part.substring(colonPos+1, commaPos).toInt();
-        WMotors[i].directionM = part.substring(commaPos+1).toInt();
-    }
-
-    // Parse Speed
-    String speedPart = parts[4];
-    int speedIdx = speedPart.indexOf(':');
-    Speed = speedPart.substring(speedIdx+1).toInt();
-
-    // Parse M5 to M12 
-    for (int i = 0; i < 4; i++) { // Solo 4 motores nuevos, pero 8 entradas
-        String partForward = parts[5+i];
-        String partReverse = parts[9+i]; // Ajustar según duplicación
-        int colonPosF = partForward.indexOf(':');
-        int commaPosF = partForward.indexOf(',');
-        DMotors[i].speed = partForward.substring(colonPosF+1, commaPosF).toInt();
-        DMotors[i].directionM = partForward.substring(commaPosF+1).toInt();
-
-        // Set PWM based on direction
-        if (DMotors[i].directionM == 0) {
-            analogWrite(DMotors[i].pwmPinForward, DMotors[i].speed);
-            analogWrite(DMotors[i].pwmPinReverse, 0);
-        } else {
-            analogWrite(DMotors[i].pwmPinForward, 0);
-            analogWrite(DMotors[i].pwmPinReverse, DMotors[i].speed);
-        }
-    }
-
-    // Handle direction and accelerate for original motors
-    bool directionChanged = false;
-    for (int i = 0; i < 4; i++) {
-        if (WMotors[i].directionM != WMotors[i].lastDirection && Speed > 0) {
-            directionChanged = true;
-            break;
-        }
-    }
-    if (directionChanged) {
-        accelerate(0);
-        for (int i = 0; i < 4; i++) {
-            WMotors[i].lastDirection = WMotors[i].directionM;
-            digitalWrite(WMotors[i].dirPin, WMotors[i].directionM);
-        }
-    } else {
-        for (int i = 0; i < 4; i++) {
-            digitalWrite(WMotors[i].dirPin, WMotors[i].directionM);
-        }
-    }
-    accelerate(Speed);
-}
-
-void loop(){
-  if (lastReceivedData != "") {
-    Serial.print("Datos recibidos via I2C: ");
-    Serial.println(lastReceivedData);
-  }
-  delay(10);
-}
-
-}
-'''
-import smbus
+import serial
 import time
+from encoders import ESP32Reader  # Import the ESP32Reader class from ENCODERS.pyz
 
-I2C_BUS = 1  # Bus I2C 1
-I2C_ADDRESS = 0x10  # Direction
+# Global variables to manage connected boards and latest values
+connected_boards = []
+latest_values = []  # Shared list to store the latest values from encoders
 
-bus = smbus.SMBus(I2C_BUS)
+# Global variable to track previous motor states
+prev_DMotors = {
+    "M5": {"speed": 0, "direction": 0},
+    "M6": {"speed": 0, "direction": 0},
+    "M7": {"speed": 0, "direction": 0},
+    "M8": {"speed": 0, "direction": 0}
+}
 
 def map_range(value, in_min, in_max, out_min, out_max):
-    if value == 0:
-        return 0 
+    if abs(value) < 0.01:  # Consider values close to 0 as 0
+        return 0
     return int((value - in_min) * (out_max - out_min) / (in_max - in_min) + out_min)
 
-
-# Function to send data to the ESP32S3 via I2C
-def send_control_string(data):
+def esp_define(port: str):
     try:
-        # Convert string to a list of bytes (ASCII values)
-        byte_data = [ord(c) for c in data]
-        # send data to ESP32S3
-        bus.write_i2c_block_data(I2C_ADDRESS, 0, byte_data)
-        print(f"I2C: {data.strip()}")
-    except IOError as e:
-        print(f"ERROR I2C: {e}")
-    time.sleep(0.01)  
+        esp = serial.Serial(port, 115200, timeout=1)  
+        time.sleep(2)  # Esperar a que el ESP inicie
+        return esp
+    except serial.SerialException as e:
+        print(f"Error abriendo el puerto serial: {e}")
+        return None
 
-# Main function to control motors
-def control_motors(motor_factors, trigger_left, trigger_right, grades_1, grades_2, last_data):
-    # Determine direction and base speed for original motors
+def begin_esp(ports):
+    global connected_boards, latest_values
+    # Initialize the list of latest values with None based on the number of ports (up to 4)
+    latest_values = [None] * len(ports)
+    
+    # Create a list of ESP32Reader objects, assigning indices for the shared list
+    boards = [ESP32Reader(port, baudrate=115200, name=f"Board_{i+1}", 
+                          latest_values=latest_values, index=i) 
+              for i, port in enumerate(ports)]
+    
+    # Filter only the boards that connected successfully
+    connected_boards = [board for board in boards if board.ser is not None]
+    if not connected_boards:
+        print("No boards connected!")
+        return
+    
+    print(f"Connected boards: {[board.name for board in connected_boards]}")
+    # Start reading on each connected board
+    for board in connected_boards:
+        board.start_reading()
+
+def stop_read():
+    global connected_boards
+    for board in connected_boards:
+        board.stop_reading()
+    connected_boards = []
+
+def control_motors(esp, motor_factors, trigger_left, trigger_right, grades_1, grades_2, last_data):
+    global prev_DMotors
+
+    if not esp or not esp.is_open:
+        print("ESP no está conectado.")
+        return last_data
+    
+    # Determine direction and base speed for the original motors (M1-M4)
     direction = 0
     base_speed = 0
 
-    grades_1 = 0
+    # Get the latest values from the encoders on the connected ESP32 boards (up to 4)
+    encoder1 = 90  # Default value if no data (for M5)
+    encoder2 = 90  # Default value if no data (for M6)
+    encoder3 = 90  # Default value if no data (for M7)
+    encoder4 = 90  # Default value if no data (for M8)
+    if len(connected_boards) >= 1:
+        last_value1 = connected_boards[0].get_latest_value()
+        if last_value1 is not None:
+            encoder1 = last_value1
+    if len(connected_boards) >= 2:
+        last_value2 = connected_boards[1].get_latest_value()
+        if last_value2 is not None:
+            encoder2 = last_value2
+    if len(connected_boards) >= 3:
+        last_value3 = connected_boards[2].get_latest_value()
+        if last_value3 is not None:
+            encoder3 = last_value3
+    if len(connected_boards) >= 4:
+        last_value4 = connected_boards[3].get_latest_value()
+        if last_value4 is not None:
+            encoder4 = last_value4
 
+    # Determine base speed and direction for M1-M4 based on triggers
     if trigger_left > 0 and trigger_right > 0:
-        base_speed = 0  
+        base_speed = 0  # If both triggers are pressed, speed 0
     elif trigger_left > 0:
         base_speed = trigger_left
-        direction = 0  
+        direction = 0  # Forward
     elif trigger_right > 0:
         base_speed = trigger_right
-        direction = 1  
+        direction = 1  # Reverse
 
-    # Building the control chain for the 4 wheel motors
+    # Build the control string for the traction motors (M1-M4)
     data = (
         f"M1:{motor_factors['M1']},{direction};"
         f"M2:{motor_factors['M2']},{direction};"
@@ -198,7 +107,6 @@ def control_motors(motor_factors, trigger_left, trigger_right, grades_1, grades_
         f"Speed:{base_speed};"
     )
 
-    # Add control for the 4 new motors, which are steering motors.
     DMotors = {
         "M5": {"speed": 0, "direction": 0},  # Motor 5
         "M6": {"speed": 0, "direction": 0},  # Motor 6
@@ -206,38 +114,79 @@ def control_motors(motor_factors, trigger_left, trigger_right, grades_1, grades_
         "M8": {"speed": 0, "direction": 0}   # Motor 8
     }
 
-    # Control M5 and M6 based on joy_1
-    if grades_1 < 90:
-        DMotors["M5"] = {"speed": 50, "direction": 0}  # Right (forward)
-        DMotors["M6"] = {"speed": 50, "direction": 0}  # Right (forward)
-    elif grades_1 > 90:
-        DMotors["M5"] = {"speed": 50, "direction": 1}  # Left (reverse)
-        DMotors["M6"] = {"speed": 50, "direction": 1}  # Left (reverse)
-    else:
-        DMotors["M5"] = {"speed": 0, "direction": 0}
-        DMotors["M6"] = {"speed": 0, "direction": 0}
-
-    # Control M7 and M8 based on joy_2
-    if grades_2 < 90:
-        DMotors["M7"] = {"speed": 50, "direction": 0}  # Right (forward)
-        DMotors["M8"] = {"speed": 50, "direction": 0}  # Right (forward)
-    elif grades_2 > 90:
-        DMotors["M7"] = {"speed": 50, "direction": 1}  # Left (reverse)
-        DMotors["M8"] = {"speed": 50, "direction": 1}  # Left (reverse)
-    else:
-        DMotors["M7"] = {"speed": 0, "direction": 0}
-        DMotors["M8"] = {"speed": 0, "direction": 0}
+    if grades_1 == 0:
+        grades = 90
     
+    if grades_2 == 0:
+        grades_2 = 90
 
-    # Append new motors to the control string
-    for i in range(5, 9):  # M5 to M8
+    # Control M5 based on grades_1 and encoder1
+    if abs(encoder1 - grades_1) <= 2:  # Stop if encoder1 is within ±2 degrees of grades_1
+        DMotors["M5"] = {"speed": 0, "direction": 0}
+    else:
+        if grades_1 < encoder1:  # Move to decrease encoder1 towards grades_1
+            DMotors["M5"] = {"speed": 50, "direction": 0}  # Assuming direction 0 decreases encoder1
+        elif grades_1 > encoder1:  # Move to increase encoder1 towards grades_1
+            DMotors["M5"] = {"speed": 50, "direction": 1}  # Assuming direction 1 increases encoder1
+
+    # Control M6 based on grades_1 and encoder2
+    if abs(encoder2 - grades_1) <= 2:  # Stop if encoder2 is within ±2 degrees of grades_1
+        DMotors["M6"] = {"speed": 0, "direction": 0}
+    else:
+        if grades_1 < encoder2:  # Move to decrease encoder2 towards grades_1
+            DMotors["M6"] = {"speed": 50, "direction": 0}  # Assuming direction 0 decreases encoder2
+        elif grades_1 > encoder2:  # Move to increase encoder2 towards grades_1
+            DMotors["M6"] = {"speed": 50, "direction": 1}  # Assuming direction 1 increases encoder2
+
+    # Control M7 based on grades_2 and encoder3
+    if abs(encoder3 - grades_2) <= 2:  # Stop if encoder3 is within ±2 degrees of grades_2
+        DMotors["M7"] = {"speed": 0, "direction": 0}
+    else:
+        if grades_2 < encoder3:  # Move to decrease encoder3 towards grades_2
+            DMotors["M7"] = {"speed": 50, "direction": 0}  # Assuming direction 0 decreases encoder3
+        elif grades_2 > encoder3:  # Move to increase encoder3 towards grades_2
+            DMotors["M7"] = {"speed": 50, "direction": 1}  # Assuming direction 1 increases encoder3
+
+    # Control M8 based on grades_2 and encoder4
+    if abs(encoder4 - grades_2) <= 2:  # Stop if encoder4 is within ±2 degrees of grades_2
+        DMotors["M8"] = {"speed": 0, "direction": 0}
+    else:
+        if grades_2 < encoder4:  # Move to decrease encoder4 towards grades_2
+            DMotors["M8"] = {"speed": 50, "direction": 0}  # Assuming direction 0 decreases encoder4
+        elif grades_2 > encoder4:  # Move to increase encoder4 towards grades_2
+            DMotors["M8"] = {"speed": 50, "direction": 1}  # Assuming direction 1 increases encoder4
+
+    # Add controls for M5-M8 to the data string
+    for i in range(5, 9): 
         data += f"M{i}:{DMotors[f'M{i}']['speed']},{DMotors[f'M{i}']['direction']};"
 
+    # Use ETX (\x03, ASCII 3) as the end marker instead of \n
+    data += "\x03"
 
-    data += "\n"  # End the string with a line break
+    motor_state_changed = (
+        DMotors["M5"] != prev_DMotors["M5"] or
+        DMotors["M6"] != prev_DMotors["M6"] or
+        DMotors["M7"] != prev_DMotors["M7"] or
+        DMotors["M8"] != prev_DMotors["M8"]
+    )
 
-    if data != last_data and base_speed % 5 == 0 and grades_2 % 5 == 0 and grades_1 % 5 == 0:
-        send_control_string(data)
+    # Send the control string only if it has changed or motor states changed
+    if (data != last_data and (base_speed % 5 == 0 and grades_1 % 5 == 0 and grades_2 % 5 == 0)) or motor_state_changed:
+        # send_control_string(data)
+        esp.write(data.encode())
         last_data = data
+        # Update previous motor states
+        prev_DMotors["M5"] = DMotors["M5"].copy()
+        prev_DMotors["M6"] = DMotors["M6"].copy()
+        prev_DMotors["M7"] = DMotors["M7"].copy()
+        prev_DMotors["M8"] = DMotors["M8"].copy()
 
     return last_data
+
+def read_data(esp):
+    while True:
+        datos1 = esp.readline().decode('utf-8').strip()
+        if not datos1:  # Si no hay datos, romper el bucle
+            print("No hay más datos. Saliendo...")
+            break
+        print(f"ESP1: {datos1}")

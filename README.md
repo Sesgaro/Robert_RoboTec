@@ -37,14 +37,6 @@ With this, we can start, the file `UART_Test1.py` we can read 2 ESPs, this is a 
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process
 ```
 
-# Update 0.2
+# Update 0.3
 
-`Pwm_and_control_Test1.py` This code is the first control connection test, controller -> Laptop/Jetson -> ESP.
-
-The computer sends a text string each time the trigger values are updated, the ESP separates and transforms from scripts to integer and float values.
-
-# TX1 Works with the XboxController!!
-Fixed compatibility issues with Jetson and reprogrammed the file `Pwm_and_control_Test1.py` (now called `espmotors.py`) to be separated by functions, and to be invoked by `main.py`.
-
-# Updated requirements
-Due to problems with the `inputs` library we opted to change to `pygame` for reading the command.
+Vesc test added

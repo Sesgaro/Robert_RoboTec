@@ -10,6 +10,8 @@ VescCAN llanta1(CAN0, 0x0A);
 VescCAN llanta2(CAN0, 0x0B);
 //VescCAN llanta3(CAN0, 0x0C);
 //VescCAN llanta4(CAN0, 0x0D);
+VescCAN* llantas[] = {&llanta1, &llanta2}; //&llanta3, &llanta4}
+const int numLlantas = 2;
 
 void setup()
 {
@@ -21,12 +23,15 @@ void setup()
 }
 
 void loop() {
-    numLlantas = 2;
     llanta1.spin();
     llanta2.spin();
 
+    llanta1.vesc_set_erpm(30);
+    llanta2.vesc_set_erpm(30);
+
     if (millis() - last_print_data > 1000) {
         for (int i = 0; i < numLlantas; i++) {
+
             Serial.print("Llanta ");
             Serial.print(i + 1);  // Print wheel number (1 or 2)
             Serial.println(" data:");
